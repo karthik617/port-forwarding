@@ -1,2 +1,8 @@
 .env
 node_modules/
+.DS_Store
+.idea
+.vscode
+*.log
+*.tgz
+package-lock.json
