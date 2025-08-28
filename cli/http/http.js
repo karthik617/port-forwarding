@@ -3,7 +3,7 @@ const http = require("http");
 const dotenv = require("dotenv");
 dotenv.config();
 
-function createTunnelHttp(localPort, targetHost = process.env.TARGET_HOST || "localhost", remoteHost = process.env.REMOTE_HOST || "localhost") {
+function createTunnelHttp(localPort, targetHost = "localhost", remoteHost = process.env.TUNNEL_HOST || "localhost") {
   const tunnelSocket = net.connect(9001, remoteHost, () => {
     tunnelSocket.write(`HTTP:${targetHost}:${localPort}`);
   });

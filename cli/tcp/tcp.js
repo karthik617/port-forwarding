@@ -2,7 +2,7 @@ const net = require("net");
 const dotenv = require("dotenv");
 dotenv.config();
 
-function createTunnelTcp(localPort, targetHost = process.env.TARGET_HOST || "localhost", remoteHost = process.env.REMOTE_HOST || "localhost") {
+function createTunnelTcp(localPort, targetHost = "localhost", remoteHost = process.env.TUNNEL_HOST || "localhost") {
   const tunnelSocket = net.connect(9001, remoteHost, () => {
     tunnelSocket.write(`TCP:${targetHost}:${localPort}`);
   });

@@ -20,9 +20,13 @@ const controlServer = net.createServer(tunnelSocket => {
         tunnelSocket.write('ERROR: Invalid registration\n');
         return tunnelSocket.end();
       }
-
-      const id = uuidv4().slice(0, 6);
-      const subdomain = `${id}.${targetPort}.${targetHost}`;
+      
+      let id = uuidv4().slice(0, 6);
+      while (tunnels.has(id)) {
+        id = uuidv4().slice(0, 6);
+      }
+      // const subdomain = `${id}.${targetPort}.${targetHost}`;
+      const subdomain = id;
 
       tunnels.set(subdomain, { type, socket: tunnelSocket, targetHost, targetPort });
       console.log(`✅ Tunnel registered: ${subdomain} (${type})`);
@@ -30,7 +34,9 @@ const controlServer = net.createServer(tunnelSocket => {
       if (type === 'TCP') {
         createTcpTunnel(tunnelSocket, subdomain, targetHost, targetPort);
       } else if (type === 'HTTP') {
-        tunnelSocket.write(`URL:http://${subdomain}:${PUBLIC_HTTP_PORT}\n`);
+        // tunnelSocket.write(`URL:http://${subdomain}:${PUBLIC_HTTP_PORT}\n`);
+        tunnelSocket.write(`URL:http://${subdomain}.${targetHost}:${PUBLIC_HTTP_PORT}\n`);
+
       } else {
         tunnelSocket.write('ERROR: Unsupported tunnel type\n');
         return tunnelSocket.end();
@@ -42,8 +48,19 @@ const controlServer = net.createServer(tunnelSocket => {
       });
 
       tunnelSocket.on('error', err => {
-        console.error(`⚠️ Tunnel error (${subdomain}):`, err.message);
         tunnels.delete(subdomain);
+        console.error(`⚠️ Tunnel error (${subdomain}):`, err.message);
+      });
+      tunnelSocket.on('end', () => {
+        tunnels.delete(subdomain);
+        console.log(`❌ Tunnel end: ${subdomain}`);
+      });
+      tunnelSocket.on('timeout', () => {
+        tunnels.delete(subdomain);
+        console.log(`❌ Tunnel timeout: ${subdomain}`);
+      });
+      tunnelSocket.on('data', data => {
+        console.log('🔗 Tunnel data:', data.toString());
       });
 
     } catch (err) {
@@ -67,15 +84,16 @@ function createTcpTunnel(tunnelSocket, subdomain, targetHost, targetPort) {
     relayServer.listen(0, () => {
       const relayPort = relayServer.address().port;
       tunnelSocket.write(`RELAY:${relayPort}`);
-      console.log(`🔄 Relay established for ${subdomain} (relay port: ${relayPort})`);
+      console.log(`🔄 Relay established for (id::${subdomain}) ${targetHost} on (relay port: ${relayPort})`);
     });
   });
 
   tcpServer.listen(0, () => {
     const publicPort = tcpServer.address().port;
     tunnels.set(subdomain, { type: 'TCP', socket: tunnelSocket, port: publicPort, targetHost, targetPort });
-    tunnelSocket.write(`URL:http://${subdomain}:${publicPort}\n`);
-    console.log(`🌐 TCP tunnel ready: ${subdomain}:${publicPort}`);
+    // tunnelSocket.write(`URL:http://${subdomain}:${publicPort}\n`);
+    tunnelSocket.write(`URL:tcp://${process.env.TUNNEL_HOST}:${publicPort}\n`)
+    console.log(`🌐 TCP tunnel ready for ${targetHost} on tcp://${process.env.TUNNEL_HOST}:${publicPort}`);
   });
 
   tcpServer.on('error', err => console.error(`TCP server error for ${subdomain}:`, err.message));
@@ -83,9 +101,9 @@ function createTcpTunnel(tunnelSocket, subdomain, targetHost, targetPort) {
 
 // -------------------- HTTP Public Server (Optional) --------------------
 const publicHttp = http.createServer((req, res) => {
-  const host = req.headers.host?.split(':')[0];
+  // const host = req.headers.host?.split(':')[0];
+  const host = req.headers.host?.split('.')[0];
   if (!host) return res.end('Bad Request');
-
   const tunnel = tunnels.get(host);
   if (!tunnel || tunnel.type !== 'HTTP') {
     res.writeHead(404);
