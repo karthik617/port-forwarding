@@ -7,8 +7,7 @@
     "tunnel": "./cli/index.js"
   },
   "scripts": {
-    "start": "node tunnel/index.js",
-    "build": "node cli/index.js"
+    "start": "node tunnel/index.js"
   },
   "author": "",
   "license": "ISC",
